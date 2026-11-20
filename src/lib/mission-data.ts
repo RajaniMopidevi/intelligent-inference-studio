@@ -9,6 +9,7 @@ export const CLASSES = [
 export type ClassKey = (typeof CLASSES)[number]["key"];
 
 export const METRICS = {
+  validationImages: 1607,
   meanIoU: 0.7464,
   pixelAccuracy: 0.941623,
   architecture: "DeepLabV3+",

@@ -40,9 +40,14 @@ function Analytics() {
   return (
     <>
       <PageHeader kicker="Validation results · baseline checkpoint" title="Terrain Analytics">
-        Measured on the AI4Mars validation split with the final baseline model ({METRICS.checkpoint}).
+        Measured on {METRICS.validationImages.toLocaleString()} AI4Mars validation images with the final baseline model ({METRICS.checkpoint}). These are validation results — not the accuracy of live predictions on your uploads.
       </PageHeader>
       <div className="mx-auto grid max-w-7xl gap-6 px-5 md:grid-cols-[1fr_1fr_2fr]">
+        <div className="grid grid-cols-2 gap-4 md:col-span-3 md:grid-cols-4">
+          {[[METRICS.validationImages.toLocaleString(), "Validation images"], [`${(METRICS.meanIoU * 100).toFixed(2)}%`, "Mean IoU"], [`${(METRICS.pixelAccuracy * 100).toFixed(2)}%`, "Pixel accuracy"], ["33.25%", "Weakest: Big Rock IoU"]].map(([v, l]) => (
+            <div key={l} className="glass p-5"><div className="font-display text-2xl font-bold text-primary">{v}</div><div className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">{l}</div></div>
+          ))}
+        </div>
         <Gauge value={METRICS.meanIoU} label="Mean IoU" color="oklch(0.82 0.14 205)" />
         <Gauge value={METRICS.pixelAccuracy} label="Pixel accuracy" color="oklch(0.66 0.18 40)" />
         <div className="glass p-6">
@@ -66,8 +71,8 @@ function Analytics() {
                 {CLASSES.map((c) => (
                   <tr key={c.key} className="border-t border-border">
                     <td className="py-3 font-sans"><span className="mr-2 inline-block h-3 w-3 rounded-sm align-middle" style={{ background: `rgb(${c.rgb.join(",")})` }} />{c.label}</td>
-                    <td>{c.iou.toFixed(4)}</td>
-                    <td className="font-sans text-muted-foreground">{c.key === "big_rock" ? "Rare, small objects — hardest class; drives the mIoU down." : "Strong, well-represented class."}</td>
+                    <td>{(c.iou * 100).toFixed(2)}%</td>
+                    <td className="font-sans text-muted-foreground">{c.key === "big_rock" ? "Weakest class: rare in the data (class imbalance) and often confused with Bedrock." : "Strong, well-represented class."}</td>
                   </tr>
                 ))}
               </tbody>
@@ -78,6 +83,10 @@ function Analytics() {
           <h2 className="text-sm tracking-widest">WHAT DO THESE MEAN?</h2>
           <p className="mt-3 text-sm text-muted-foreground"><b className="text-foreground">IoU (Intersection over Union)</b> compares the area the model labelled as a class with the area that truly is that class: overlap ÷ combined area. 1.0 is a perfect match; it punishes both missed pixels and false alarms. <b className="text-foreground">Mean IoU</b> averages the four classes equally, so a weak rare class like Big Rock counts as much as Soil.</p>
           <p className="mt-3 text-sm text-muted-foreground"><b className="text-foreground">Pixel accuracy</b> is simply the share of labelled pixels classified correctly. It's high when common classes are right, which is why it sits above mIoU.</p>
+        </div>
+        <div className="glass border-l-4 border-l-accent p-6 md:col-span-3">
+          <h2 className="text-sm tracking-widest">WHY BIG ROCK LAGS</h2>
+          <p className="mt-3 text-sm text-muted-foreground">Big rocks cover only a small fraction of labelled pixels, so the model sees far fewer examples (class imbalance). They also share texture and tone with Bedrock, and many of the errors are big-rock pixels predicted as Bedrock. Weighted cross-entropy helps, but this remains the main limitation. Results from the oversampling experiment are intentionally not mixed into these baseline numbers.</p>
         </div>
         <div className="glass p-6">
           <h2 className="text-sm tracking-widest">CONFUSION MATRIX</h2>

@@ -30,3 +30,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+backend/.venv/
+backend/checkpoints/
+*.pth
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example

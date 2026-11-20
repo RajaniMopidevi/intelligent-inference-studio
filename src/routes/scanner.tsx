@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadCloud, ScanLine, RotateCcw, AlertTriangle, Info } from "lucide-react";
 import { PageHeader, ClassLegend } from "@/components/mars/Shell";
-import { scanTerrain, type ScanResult } from "@/lib/scan.functions";
+import { predict, checkHealth, getApiBaseUrl, type ScanResult } from "@/lib/inference-api";
 import { CLASSES } from "@/lib/mission-data";
 
 export const Route = createFileRoute("/scanner")({
@@ -23,7 +22,11 @@ export const Route = createFileRoute("/scanner")({
 const OK_TYPES = ["image/jpeg", "image/png"];
 
 function Scanner() {
-  const scan = useServerFn(scanTerrain);
+  const [health, setHealth] = useState<"checking" | "online" | "noModel" | "offline" | "unset">("checking");
+  useEffect(() => {
+    if (!getApiBaseUrl()) { setHealth("unset"); return; }
+    checkHealth().then((h) => setHealth(!h.online ? "offline" : h.modelLoaded ? "online" : "noModel"));
+  }, []);
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -31,6 +34,7 @@ function Scanner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   const [view, setView] = useState<"original" | "mask" | "overlay">("overlay");
 
   const pick = useCallback((f: File | undefined) => {
@@ -38,7 +42,8 @@ function Scanner() {
     if (!f) return;
     if (!OK_TYPES.includes(f.type)) { setError("Unsupported file. Please upload a JPG, JPEG or PNG image."); return; }
     if (f.size > 10 * 1024 * 1024) { setError("This image is larger than 10 MB."); return; }
-    setFile(f); setPreview(URL.createObjectURL(f));
+    const url = URL.createObjectURL(f); setFile(f); setPreview(url);
+    const im = new Image(); im.onload = () => setDims({ w: im.naturalWidth, h: im.naturalHeight }); im.src = url;
   }, []);
 
   const reset = () => { setFile(null); setPreview(null); setResult(null); setError(null); if (inputRef.current) inputRef.current.value = ""; };
@@ -47,10 +52,7 @@ function Scanner() {
     if (!file) return;
     setLoading(true); setError(null);
     try {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-      const res = await scan({ data: { filename: file.name, contentType: file.type, dataBase64: btoa(bin) } });
-      if (res.ok) { setResult(res.result); setView("overlay"); } else setError(res.error);
+      setResult(await predict(file)); setView("overlay");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Inference failed.");
     } finally { setLoading(false); }
@@ -64,6 +66,7 @@ function Scanner() {
         Upload a rover image and the baseline DeepLabV3+ model segments it on the Python inference service.
       </PageHeader>
       <div className="mx-auto max-w-7xl px-5">
+        <HealthBadge state={health} />
         <div className="glass mb-6 flex gap-3 p-4 text-sm text-muted-foreground">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <p>This model is built for AI4Mars-style rover imagery (grayscale NAVCAM/MASTCAM terrain). Other photos still get a prediction, but it may be meaningless — and with no ground-truth mask, accuracy can't be measured for uploads.</p>
@@ -139,10 +142,27 @@ function Scanner() {
               })}
             </div>
             <div className="mt-8"><ClassLegend /></div>
-            {result?.inferenceMs != null && <p className="mt-6 font-mono text-xs text-muted-foreground">Inference {Math.round(result.inferenceMs)} ms · {result.width}×{result.height}</p>}
+            {dims && <p className="mt-6 font-mono text-xs text-muted-foreground">Uploaded image {dims.w}×{dims.h} px</p>}
+            {result?.inferenceMs != null && <p className="mt-1 font-mono text-xs text-muted-foreground">Inference time {Math.round(result.inferenceMs)} ms · Output {result.width}×{result.height} px</p>}
           </aside>
         </div>
       </div>
     </>
+  );
+}
+
+function HealthBadge({ state }: { state: "checking" | "online" | "noModel" | "offline" | "unset" }) {
+  const map = {
+    checking: ["bg-muted-foreground", "Checking inference backend…"],
+    online: ["bg-primary", "Inference backend online · model loaded"],
+    noModel: ["bg-accent", "Backend reachable, but the model checkpoint isn't loaded"],
+    offline: ["bg-destructive", "Inference backend offline or unreachable"],
+    unset: ["bg-destructive", "Inference backend not configured (VITE_API_BASE_URL)"],
+  } as const;
+  const [dot, label] = map[state];
+  return (
+    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 font-mono text-xs text-muted-foreground">
+      <span className={`h-2 w-2 rounded-full ${dot} ${state === "online" ? "animate-pulse" : ""}`} /> {label}
+    </div>
   );
 }

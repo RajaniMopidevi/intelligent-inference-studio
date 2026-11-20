@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { PageHeader, ClassLegend } from "@/components/mars/Shell";
+import { CLASSES } from "@/lib/mission-data";
 
 export const Route = createFileRoute("/samples")({
   head: () => ({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/samples")({
   component: Samples,
 });
 
-type Sample = { id: string; title: string; image: string; groundTruth: string; prediction: string; note?: string };
+type Sample = { id: string; title: string; image: string; groundTruth?: string; prediction: string; overlay?: string; distribution?: Record<string, number>; description?: string };
 
 function Samples() {
   const [samples, setSamples] = useState<Sample[] | null>(null);
@@ -54,12 +55,22 @@ function Samples() {
               <div className="glass p-5">
                 <span className="rounded-full bg-violet/20 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-violet">Validation sample</span>
                 <h2 className="mt-3 text-lg">{s.title}</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  {[["Original", s.image], ["Ground truth", s.groundTruth], ["Model prediction", s.prediction]].map(([l, src]) => (
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {([["Original", s.image], ["Ground truth", s.groundTruth], ["Model prediction", s.prediction], ["Overlay", s.overlay]] as const).filter(([, src]) => src).map(([l, src]) => (
                     <figure key={l}><img src={src} alt={l} className="w-full rounded-lg" /><figcaption className="mt-2 text-xs uppercase tracking-widest text-muted-foreground">{l}</figcaption></figure>
                   ))}
                 </div>
-                {s.note && <p className="mt-4 text-sm text-muted-foreground">{s.note}</p>}
+                {s.description && <p className="mt-4 text-sm text-muted-foreground">{s.description}</p>}
+                {s.distribution && (
+                  <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {CLASSES.map((c) => (
+                      <div key={c.key} className="rounded-lg border border-border p-3">
+                        <p className="text-xs text-muted-foreground">{c.label}</p>
+                        <p className="font-mono text-lg">{s.distribution?.[c.key]?.toFixed(1) ?? "—"}%</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-5"><ClassLegend /></div>
               </div>
             )}

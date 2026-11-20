@@ -16,12 +16,12 @@ export const Route = createFileRoute("/lab")({
   component: Lab,
 });
 
-const PIPE = ["Rover image", "RGB · 512×512", "ImageNet norm", "ResNet-50 encoder", "ASPP", "Decoder", "4-class mask"];
+const PIPE = ["Input image", "Preprocessing (RGB · 512×512 · ImageNet norm)", "DeepLabV3+ (ResNet-50)", "Pixel-wise classification", "Segmentation mask", "Terrain distribution"];
 
 function Lab() {
   return (
     <>
-      <PageHeader kicker="Under the hood" title="Model Lab">How the terrain model was built and why the final checkpoint was chosen.</PageHeader>
+      <PageHeader kicker="Semantic segmentation · NASA AI4Mars" title="Model Lab">How the terrain model was built and why the final checkpoint was chosen.</PageHeader>
       <div className="mx-auto max-w-7xl px-5">
         <div className="glass mb-8 flex flex-wrap items-center gap-2 p-5 font-mono text-xs">
           {PIPE.map((p, i) => (
@@ -36,7 +36,7 @@ function Lab() {
             <p>~35k images from Curiosity, Opportunity and Spirit, labelled by citizen scientists with terrain classes. Pixels that are unlabelled or beyond rover range are excluded from the loss and the metrics.</p>
           </InfoCard>
           <InfoCard n="02" title="Preprocessing & masks">
-            <p>Images are converted to RGB, resized to 512×512 and normalised with ImageNet mean/std. Masks are resized with nearest-neighbour so labels stay discrete, and the "no label" value is mapped to an ignore index.</p>
+            <p>Images are converted to RGB, resized to 512×512 and normalised with ImageNet mean/std. Masks are resized with nearest-neighbour so labels stay discrete, and unlabelled pixels keep the value 255, which the loss ignores.</p>
           </InfoCard>
           <InfoCard n="03" title="DeepLabV3+">
             <p>Atrous Spatial Pyramid Pooling captures context at several scales; a light decoder fuses it with low-level features to recover sharp terrain boundaries.</p>
@@ -48,13 +48,16 @@ function Lab() {
             <p>Soil, Bedrock, Sand and Big Rock — the categories that matter for rover traversability.</p>
           </InfoCard>
           <InfoCard n="06" title="Weighted cross-entropy">
-            <p>Class weights raise the cost of mistakes on rarer classes so the model doesn't simply predict soil everywhere.</p>
+            <p>Class weights raise the cost of mistakes on rarer classes so the model doesn't simply predict soil everywhere. Pixels labelled 255 (no label) are ignored (<code>ignore_index=255</code>).</p>
           </InfoCard>
           <InfoCard n="07" title="AdamW optimizer">
             <p>Adam with decoupled weight decay gives stable fine-tuning of the pretrained encoder and regularises the decoder.</p>
           </InfoCard>
           <InfoCard n="08" title="Training & validation">
             <p>Trained on the training split with periodic, resumable checkpoints; evaluated on a held-out validation split with mean IoU and pixel accuracy. The final model is the baseline checkpoint at step 622.</p>
+          </InfoCard>
+          <InfoCard n="10" title="Limitations, plainly">
+            <p>The model has only seen Mars rover terrain photos. Holiday snaps, Earth deserts or rendered images will still get a mask, but it won't mean much. Small or distant big rocks are often missed or labelled as bedrock.</p>
           </InfoCard>
           <InfoCard n="09" title="Class imbalance & Big Rock oversampling">
             <p>Big Rock covers a tiny fraction of pixels (IoU 0.33). An experiment oversampled images containing big rocks to give the model more examples.</p>

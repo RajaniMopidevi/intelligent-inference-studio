@@ -5,9 +5,9 @@ Independent project using the public AI4Mars dataset — not an official NASA sy
 
 ## Architecture
 ```
-Browser ──► web app server function (scanTerrain) ──► FastAPI /predict (PyTorch)
+Browser ──(FormData "file")──► FastAPI /predict (PyTorch)   ·   /health polled on the Scanner page
 ```
-The browser never sees the backend URL: it lives in the `INFERENCE_API_URL` secret, read only on the server.
+API client: `src/lib/inference-api.ts` (timeouts, offline/CORS errors, base64 PNG decoding). No secrets live in the frontend.
 
 ## 1. Inference backend (`backend/`)
 1. Get the baseline checkpoint `mars_resume_20261114T163234Z_step_00000622.pth` (~306 MB) from your training outputs
@@ -23,7 +23,7 @@ The browser never sees the backend URL: it lives in the `INFERENCE_API_URL` secr
    curl -F "file=@sample.jpg;type=image/jpeg" http://localhost:8000/predict
    ```
    Or `docker build -t ai4mars-api backend` and host it (Render, Fly.io, Railway, Hugging Face Spaces, a GPU VM…).
-5. Optional: set `API_KEY` on the backend.
+5. The checkpoint, `.venv` and caches are git-ignored. Use `CHECKPOINT_URL` (private/signed link) to download it on the host.
 
 ### API
 - `GET /health` → `{status, device}`
@@ -32,11 +32,20 @@ The browser never sees the backend URL: it lives in the `INFERENCE_API_URL` secr
 - Preprocessing matches training: RGB → 512×512 → ImageNet mean/std; `model.eval()` + `torch.inference_mode()`.
 
 ## 2. Connect the web app
-Add secrets `INFERENCE_API_URL` (e.g. `https://your-api.example.com`) and, if used, `INFERENCE_API_KEY`.
+Set `VITE_API_BASE_URL` (see `.env.example`):
+- Local: `VITE_API_BASE_URL=http://localhost:8000` in `.env`, then run the web app and the backend.
+- Production: set it to your deployed HTTPS backend URL and rebuild. Make sure the backend's CORS allows your site's origin.
+
+`VITE_*` values are public by design — never put keys in them.
+
+## Local test
+1. Start the backend (section 1) and confirm `curl http://localhost:8000/health` shows `"status":"ok"`.
+2. Start the web app, open `/scanner`: the badge should say "online · model loaded".
+3. Upload an AI4Mars JPG/PNG → Scan Terrain → switch Original / Mask / Overlay, check percentages and inference time.
 
 ## 3. Sample missions
 Export real validation triplets into `public/samples/` and list them in `public/samples/manifest.json`:
 ```json
-[{ "id": "s1", "title": "Curiosity NAVCAM – sol 1234", "image": "/samples/s1.jpg", "groundTruth": "/samples/s1_gt.png", "prediction": "/samples/s1_pred.png" }]
+[{ "id": "s1", "title": "Curiosity NAVCAM – sol 1234", "image": "/samples/s1.jpg", "groundTruth": "/samples/s1_gt.png", "prediction": "/samples/s1_pred.png", "overlay": "/samples/s1_overlay.png", "distribution": {"soil": 52.1, "bedrock": 30.4, "sand": 15.2, "big_rock": 2.3}, "description": "Short scene description" }]
 ```
 Nothing is shown until real outputs are added.
