@@ -49,6 +49,32 @@ function isH3SwallowedErrorBody(body: string): boolean {
 // twice and renders garbled.
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    // AI4Mars ONNX model proxy
+    const url = new URL(request.url);
+
+    if (url.pathname === "/api/model") {
+      try {
+        const upstream = await fetch(
+          "https://huggingface.co/Rajani25/mars-terrain-deeplabv3-onnx/resolve/main/mars_terrain.onnx"
+        );
+
+        if (!upstream.ok || !upstream.body) {
+          return new Response("Model download failed", { status: 502 });
+        }
+
+        return new Response(upstream.body, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "Cache-Control": "public, max-age=86400",
+          },
+        });
+      } catch (error) {
+        console.error("Model proxy error:", error);
+        return new Response("Model proxy failed", { status: 502 });
+      }
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

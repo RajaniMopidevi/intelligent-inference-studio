@@ -6,7 +6,7 @@ import type { ClassKey } from "./mission-data";
 const SIZE = 512;
 
 const MODEL_URL =
-  "https://huggingface.co/Rajani25/mars-terrain-deeplabv3-onnx/resolve/main/mars_terrain.onnx";
+  "/api/model";
 
 const MEAN: [number, number, number] = [
   0.485, 0.456, 0.406,
